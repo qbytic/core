@@ -5,10 +5,10 @@ from psycopg2 import IntegrityError
 
 from app_init import UserTable
 from auth_token import (
-    regenerate_access_token,
     issue_access_token,
-    require_jwt,
     issue_refresh_token,
+    regenerate_access_token,
+    require_jwt,
 )
 from danger import (
     ACCESS_TOKEN,
@@ -17,7 +17,7 @@ from danger import (
     create_token,
     decode_token,
 )
-from discord_integrations import add_to_guild, exchange_code
+from discord_integrations import exchange_code
 from response_caching import cache
 from util import AppException
 from util import ParsedRequest as _Parsed
@@ -36,14 +36,6 @@ def register(request: _Parsed):
     email = get("email")
     school = get("school")
     password = get("password")
-    # this data is signed to stop registration if we catch any tampering
-    # as this is user's data, it's not an issue sending it back to them
-    signed_discord_data = decode_token(get("signed_discord"))
-
-    discord_id = signed_discord_data["discord_id"]
-    discord_access_token = signed_discord_data["access"]
-    discord_refresh_token = signed_discord_data["refresh"]
-    discord_token_expires_in = signed_discord_data["expires"]
 
     try:
         user_data = UserTable(
@@ -53,12 +45,7 @@ def register(request: _Parsed):
             school=school,
             password=password,
             team_data=init_user_event_dict(),
-            discord_id=discord_id,
-            discord_access_token=discord_access_token,
-            discord_refresh_token=discord_refresh_token,
-            discord_token_expires_in=discord_token_expires_in,
         )
-        add_to_guild(user_data)
         add_to_db(user_data)
         return user_data.as_json
     except Exception as e:
@@ -115,11 +102,36 @@ def re_authenticate(req: _Parsed):
         )
 
 
-def get_discord_token(req: _Parsed):
-    code = req.json["code"]
-    data = exchange_code(code)
-    discord_token = create_token(data["token"])
-    return {"token": discord_token, "autofill": data["autofill"]}
+@require_jwt()
+def setup_discord(request: _Parsed, creds=CredManager):
+    user = get_user_by_id(creds.user)
+    if all(
+        x
+        for x in (
+            user.discord_id,
+            user.discord_access_token,
+            user.discord_refresh_token,
+            user.discord_token_expires_in,
+        )
+    ):
+        raise AppException("Discord already linked!!")
+    code = request.json["code"]
+
+    discord_response = exchange_code(code)
+
+    access = discord_response["access"]
+    refresh = discord_response["refresh"]
+    expires = discord_response["expires"]
+    discord_id = discord_response["discord_id"]
+
+    user.discord_id = discord_id
+    user.discord_access_token = access
+    user.discord_refresh_token = refresh
+    user.discord_token_expires_in = expires
+
+    save_to_db()
+
+    return {"user_data": user.as_json}
 
 
 # creds  will be injected by require_jwt
@@ -133,7 +145,7 @@ def get_user_details(request: _Parsed, user: str, creds: CredManager = CredManag
     user_details = get_user_by_id(user)
     json = user_details.as_json
     json.pop("_secure_")
-    return json
+    return {"user_data": json}
 
 
 def self_details(request: _Parsed, creds: CredManager):

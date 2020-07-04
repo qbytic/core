@@ -81,7 +81,12 @@ def create_team(request: _Parsed, team_event, creds: CredManager = CredManager):
         raise AppException("Event does not exist")
 
     registration_data = get("registration_data")
+
     user = get_user_by_id(creds.user)
+
+    assert_user_has_discord(
+        user, error_message="Cannot create clan without integrating with discord"
+    )
 
     assert_user_is_clanless(user, team_event, prefix="You are")
 
@@ -195,7 +200,9 @@ def request_to_join(
     user_data = get_user_by_id(user)
 
     registration_data = get("registration_data")
-
+    assert_user_has_discord(
+        user_data, error_message="You have not connected discord yet!"
+    )
     assert_user_is_clanless(user_data, event_name, prefix="You are")
 
     maximum = MAX_MEMBER_COUNT.get(event_name)
@@ -228,6 +235,21 @@ def team_list():
 
 
 editable_fields = ("email", "school", "name")
+
+
+def assert_user_has_discord(
+    user: UserTable, error_message="No discord connection found!"
+):
+    if any(
+        not x
+        for x in (
+            user.discord_id,
+            user.discord_access_token,
+            user.discord_refresh_token,
+            user.discord_token_expires_in,
+        )
+    ):
+        raise AppException(error_message)
 
 
 def assert_user_is_clanless(user: UserTable, event: str, prefix=None):

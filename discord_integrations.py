@@ -14,7 +14,7 @@ from util import AppException
 
 # from api_handlers.common import save_to_db
 
-APP_SCOPE = "email identify guilds.join"
+APP_SCOPE = "identify guilds.join"
 API_ENDPOINT = "https://discord.com/api/v6"
 _URI = "https://qbytic.com" if IS_HEROKU else "http://localhost:4200"
 
@@ -93,10 +93,7 @@ def query_user(data: dict) -> dict:
         print(js)
         raise AppException("Error while fetching user data from discord")
     data["discord_id"] = js["id"]
-    return {
-        "autofill": {"username": js["username"], "email": js["email"]},
-        "token": data,
-    }
+    return data
 
 
 @ensure_fresh_token

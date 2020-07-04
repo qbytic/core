@@ -127,15 +127,7 @@ class UserTable(db.Model):
         clan_requests: InvitesOrRequests = {},
         created_at: int = None,
     ):
-        raise_if_invalid_data(
-            user,
-            name,
-            email,
-            password,
-            discord_id,
-            discord_access_token,
-            discord_refresh_token,
-        )
+        raise_if_invalid_data(user, name, email, password)
         self.user = user.lower()
         self.name = name
         self.email = email

@@ -26,8 +26,8 @@ def refesh_token():
 
 @app.route("/u/discord/auth/code/", **POST_REQUEST)
 @api_response
-def sign_discord_token():
-    return users.get_discord_token(ParsedRequest(request))
+def setup_discord_auth():
+    return users.setup_discord(ParsedRequest(request))
 
 
 # ===========================================================================
@@ -113,7 +113,7 @@ def request_to_join(event, clan):
     return teams.request_to_join(ParsedRequest(request), clan, event)
 
 
-@app.route("/<event>/clans/<clan>/submi/", **POST_REQUEST)
+@app.route("/<event>/clans/<clan>/submit/", **POST_REQUEST)
 @api_response
 def submit_proj(event, clan):
     return submissions.submit(ParsedRequest(request), event, clan)
@@ -157,7 +157,7 @@ def all_users_secure():
 
 
 # view all teams
-@app.route("/admin/teams/all", strict_slashes=False)
+@app.route("/admin/teams/all/", strict_slashes=False)
 @api_response
 def all_teams_secure():
     return admin.get_secure_team_data(ParsedRequest(request))
