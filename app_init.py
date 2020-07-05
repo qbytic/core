@@ -11,7 +11,14 @@ from sqlalchemy.ext.mutable import MutableDict, MutableList
 from constants import EVENT_NAMES
 from danger import check_password_hash, generate_password_hash
 from set_env import setup_env
-from util import AppException, get_origin, safe_mkdir, sanitize, validate_email_address
+from util import (
+    AppException,
+    get_origin,
+    safe_mkdir,
+    sanitize,
+    validate_email_address,
+    json_response,
+)
 
 setup_env()
 
@@ -33,6 +40,16 @@ ONE_YEAR_IN_SECONDS = 60 * 60 * 24 * 365
 def index():
     # we disallow all bots here because we don't want useless crawling over the API
     return send_from_directory("static", "robot.txt", cache_timeout=ONE_YEAR_IN_SECONDS)
+
+
+@app.errorhandler(404)
+def catch_all(e):
+    return json_response({"error": "not found"})
+
+
+@app.errorhandler(405)
+def method_not_allowed(e):
+    return json_response({"error": "Method not allowed"})
 
 
 EXPOSE_HEADERS = ", ".join(("x-access-token", "x-refresh-token", "x-dynamic"))
@@ -73,10 +90,10 @@ class UserTable(db.Model):
     team_data: TeamData = db.Column(MutableDict.as_mutable(JSONB), nullable=False)
     # ================================================================
     #                          Discord Specific
-    discord_id: str = db.Column(db.String, unique=True, nullable=False)
-    discord_access_token: str = db.Column(db.String, nullable=False)
-    discord_refresh_token: str = db.Column(db.String, nullable=False)
-    discord_token_expires_in: int = db.Column(db.Integer, nullable=False)
+    discord_id: str = db.Column(db.String, unique=True)
+    discord_access_token: str = db.Column(db.String)
+    discord_refresh_token: str = db.Column(db.String)
+    discord_token_expires_in: int = db.Column(db.Integer)
     # ================================================================
     # =================================================================
     #                          Additional

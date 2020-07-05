@@ -9,6 +9,7 @@ from re import compile as _compile
 from time import time as _time
 from traceback import print_exc as _print_exc
 
+from flask import request as _request
 from flask import Request as _Request
 from flask import Response as _Response
 
@@ -60,11 +61,11 @@ def safe_remove(filename: str):
 
 
 class ParsedRequest:
-    def __init__(self, request):
-        self.args = dict(request.args)
-        self.headers = request.headers
-        self.json: dict = (request.get_json() or {})
-        self.method = request.method
+    def __init__(self):
+        self.args = dict(_request.args)
+        self.headers = _request.headers
+        self.json: dict = (_request.get_json() or {})
+        self.method = _request.method
 
 
 def json_response(data: dict, status=200, headers=None) -> _Response:
@@ -97,3 +98,6 @@ def api_response(func):
 
 class AppException(Exception):
     pass
+
+
+POST_REQUEST = dict(strict_slashes=False, methods=["post"])
