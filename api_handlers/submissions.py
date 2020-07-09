@@ -5,7 +5,7 @@ from constants import EVENTS_REQUIRING_SUBMISSION
 from util import AppException
 from util import ParsedRequest as _Parsed
 from util import map_to_list
-
+from time import time
 from .common import get_clan_by_id, get_user_by_id, save_to_db
 from .cred_manager import CredManager
 
@@ -38,5 +38,6 @@ def submit(request: _Parsed, event: str, team_name: str, creds=CredManager):
         raise AppException("Invalid level")
 
     team_data.submissions.append(submit_data)
+    team_data.submitted_at = time()
     save_to_db()
     return {"team_data": team_data.as_json}

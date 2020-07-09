@@ -1,14 +1,17 @@
+from typing import List
 from psycopg2 import IntegrityError
+from sqlalchemy import func
+from sqlalchemy.sql import column
+
 
 from app_init import TeamTable, UserTable
 from auth_token import require_jwt
 from constants import ALLOW_REMOVALS, ROLE_ID_DICT
+from discord_integrations import set_roles
 from response_caching import cache
 from util import AppException
 from util import ParsedRequest as _Parsed
 from util import map_to_list
-from discord_integrations import set_roles
-
 
 from .common import (
     add_to_db,
@@ -17,6 +20,7 @@ from .common import (
     get_clan_by_id,
     get_user_by_id,
     mutate,
+    query_all,
     save_to_db,
 )
 from .cred_manager import CredManager
@@ -228,10 +232,23 @@ def request_to_join(
 
 @cache("team-list", 10)
 def team_list():
-    all_users = TeamTable.query.order_by(
-        TeamTable.team_name != "admins", TeamTable.created_at.asc()
-    ).all()
-    return {"teams": map_to_list(clean_node, all_users)}
+    all_teams: List[TeamTable] = TeamTable.query.order_by(
+        TeamTable.is_disqualified.asc(),  # disqualified team placed last
+        TeamTable.team_name != "admin",  # above that we have admins
+        (
+            func.sum(column("unpacked_scores"))
+            .select()
+            .select_from(func.unnest(TeamTable.score).alias("unpacked_scores"))
+        )
+        .label("sum_scores")
+        .desc(),  # now we take the sum array and add all the scores, ordered in descending order
+        TeamTable.submitted_at.asc(),  # if scores are same, the team that submits earlier gets priority
+    )
+    teams = {x: [] for x in EVENT_NAMES}
+    for i in all_teams:
+        teams[i.team_event].append(clean_node(i))
+
+    return {"teams": teams}
 
 
 editable_fields = ("email", "school", "name")
@@ -373,4 +390,3 @@ def update_discord_roles(user_data: UserTable):
         if data.get("name") is not None:
             roles.append(ROLE_ID_DICT[event])
     set_roles(user_data.discord_id, roles)
-

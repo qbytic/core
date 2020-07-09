@@ -178,3 +178,9 @@ def edit(request: _Parsed, user: str, creds: CredManager = CredManager):
     setattr(user_data, edit_field, new_value)
     save_to_db()
     return user_data.as_json
+
+
+@require_jwt()
+def check_auth(creds=CredManager):
+    return {"user_name": creds.user}
+

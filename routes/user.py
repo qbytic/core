@@ -58,3 +58,16 @@ def user_login():
 @api_response
 def all_users():
     return users.user_list()
+
+
+@app.route("/users/auth/check/", strict_slashes=False)
+@api_response
+def check_auth_resp():
+    return users.check_auth()
+
+
+@app.route("/logout/", strict_slashes=False)
+@api_response
+def log_user_out():
+    return json_response({}, headers={"x-access-token": "", "x-refresh-token": ""})
+

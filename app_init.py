@@ -8,7 +8,8 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.ext.mutable import MutableDict, MutableList
 
-from constants import EVENT_NAMES
+from constants import EVENT_NAMES, IS_HEROKU
+from floodgate import Gate
 from danger import check_password_hash, generate_password_hash
 from set_env import setup_env
 from util import (
@@ -34,6 +35,15 @@ db = SQLAlchemy(app)
 safe_mkdir("@cache")
 
 ONE_YEAR_IN_SECONDS = 60 * 60 * 24 * 365
+# not exactly as we have 4 workers running, it's basically a lottery if you hit the same worker thrice
+gate = Gate(use_heroku_ip_resolver=IS_HEROKU, limit=1, min_requests=3)
+
+
+@app.before_request
+def gate_check():
+    is_offending = gate.guard(request)
+    if is_offending:
+        return json_response({"error": "slow down!"})
 
 
 @app.route("/robots.txt")
@@ -251,9 +261,9 @@ class TeamTable(db.Model):
     event_data: Dict = db.Column(MutableDict.as_mutable(JSONB), nullable=False)
     is_disqualified: bool = db.Column(db.Boolean)
     disqualification_reason: str = db.Column(db.String(400))
-    created_at: int = db.Column(db.Integer)
+    submitted_at: int = db.Column(db.Integer)
     current_round: int = db.Column(db.Integer)
-    submissions: SubmissionType = db.Column(MutableDict.as_mutable(JSONB))
+    submissions: SubmissionType = db.Column(MutableList.as_mutable(ARRAY(db.String)))
     score: ListOfInt = db.Column(MutableList.as_mutable(ARRAY(db.Integer)))
 
     # pylint: enable=E1101
@@ -267,7 +277,7 @@ class TeamTable(db.Model):
             "leader": self.leader,
             "is_disqualified": self.is_disqualified,
             "disqualification_reason": self.disqualification_reason,
-            "created_at": self.created_at,
+            "submitted_at": self.submitted_at,
             "current_round": self.current_round,
             "score": self.score,
             "_secure_": {
@@ -289,7 +299,7 @@ class TeamTable(db.Model):
         event_data: dict = {},
         is_disqualified: bool = False,
         disqualification_reason: str = None,
-        created_at: int = None,
+        submitted_at: int = None,
         current_round: int = 0,
         submissions: SubmissionType = [],
         score: ListOfInt = [],
@@ -305,7 +315,7 @@ class TeamTable(db.Model):
         self.event_data = event_data
         self.is_disqualified = is_disqualified
         self.disqualification_reason = disqualification_reason
-        self.created_at = time()
+        self.submitted_at = time()
         self.current_round = current_round
         self.submissions = submissions
         self.score = score
