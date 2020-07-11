@@ -5,20 +5,21 @@ from typing import Dict, List, Union
 
 from flask import Flask, Response, request, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
+from floodgate import guard
+
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.ext.mutable import MutableDict, MutableList
 
 from constants import EVENT_NAMES, IS_HEROKU
-from floodgate import Gate
 from danger import check_password_hash, generate_password_hash
 from set_env import setup_env
 from util import (
     AppException,
     get_origin,
+    json_response,
     safe_mkdir,
     sanitize,
     validate_email_address,
-    json_response,
 )
 
 setup_env()
@@ -34,22 +35,23 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
 safe_mkdir("@cache")
 
-ONE_YEAR_IN_SECONDS = 60 * 60 * 24 * 365
 # not exactly as we have 4 workers running, it's basically a lottery if you hit the same worker thrice
-gate = Gate(use_heroku_ip_resolver=IS_HEROKU, limit=1, min_requests=3)
+# gate = Gate(use_heroku_ip_resolver=IS_HEROKU, limit=1, min_requests=3)
 
 
 @app.before_request
+@guard(ban_time=5, ip_resolver="heroku" if IS_HEROKU else None)
 def gate_check():
-    is_offending = gate.guard(request)
-    if is_offending:
-        return json_response({"error": "slow down!"})
+    pass
 
 
 @app.route("/robots.txt")
-def index():
+def robots():
+    ONE_YEAR_IN_SECONDS = 60 * 60 * 24 * 365
     # we disallow all bots here because we don't want useless crawling over the API
-    return send_from_directory("static", "robot.txt", cache_timeout=ONE_YEAR_IN_SECONDS)
+    return send_from_directory(
+        "static", "robots.txt", cache_timeout=ONE_YEAR_IN_SECONDS
+    )
 
 
 @app.errorhandler(404)
