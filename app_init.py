@@ -40,7 +40,7 @@ safe_mkdir("@cache")
 
 
 @app.before_request
-@guard(ban_time=5, ip_resolver="heroku" if IS_HEROKU else None)
+@guard(ban_time=5, ip_resolver="heroku" if IS_HEROKU else None,request_count=3,per=1)
 def gate_check():
     pass
 
